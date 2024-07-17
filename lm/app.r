@@ -13,13 +13,12 @@ library(shiny)
 ui <- fluidPage(
 
     # Application title
-    titlePanel("Old Faithful Geyser Data"),
+    titlePanel("Linear Regression"),
 
     # Sidebar with a slider input for number of bins 
     sidebarLayout(
         sidebarPanel(
 
-            
             # Input: Select a file ----
             fileInput("file1", "Choose CSV File",
                       multiple = FALSE,
@@ -54,20 +53,30 @@ ui <- fluidPage(
             radioButtons("disp", "Display",
                          choices = c(Head = "head",
                                      All = "all"),
-                         selected = "head")
+                         selected = "head"),
+            tags$hr(),
+            actionButton("go", label = "Plot Linear Model")   
         ),
 
         # Show a plot of the generated distribution
         mainPanel(
            plotOutput("distPlot"),
            plotOutput("lmPlot"),
-           tableOutput("contents")
+           tableOutput("contents"),
+           tags$h3("Slope:"),
+           verbatimTextOutput("slope"),
+           tags$h3("Intercept:"),
+           verbatimTextOutput("intercept"),
+           tags$h3("Correlation Coefficient:"),
+           verbatimTextOutput("correlation")
         )
     )
 )
 
 # Define server logic required to draw a histogram
 server <- function(input, output) {
+
+    lmdata <- reactiveValues()
 
     dataInput <- reactive({
         req(input$file1)
@@ -78,42 +87,57 @@ server <- function(input, output) {
                        quote = input$quote)
         return(df)
     })
-    
-    # output$distPlot <- renderPlot({
-    #     # generate bins based on input$bins from ui.R
-    #     x    <- faithful[, 2]
-    #     bins <- seq(min(x), max(x), length.out = input$bins + 1)
-    #     print(bins)
-    #     # draw the histogram with the specified number of bins
-    #     hist(x, breaks = bins, col = 'darkgray', border = 'white')
-    # })
-    # 
+
+    observeEvent(input$go, {
+        update_lm()
+        })
+
+    update_lm <- function() {
+        lmdata$model <- lm(y ~ x, data = dataInput())
+        }
     
     output$distPlot <- renderPlot({
-        plot(dataInput()$x,dataInput()$y)
+        plot(dataInput()$x, dataInput()$y, xlab = "X", ylab = "Y")
     })
     
-    output$lmtPlot <- renderPlot({
-        plot(dataInput()$x,dataInput()$y)
+    output$lmPlot <- renderPlot({
+        plot(dataInput()$x, dataInput()$y, xlab = "X", ylab = "Y")
+        if(!is.null(lmdata$model)) {
+            abline(lmdata$model)
+        }
     })
-    
     
     output$contents <- renderTable({
-        
-        # input$file1 will be NULL initially. After the user selects
-        # and uploads a file, head of that data file by default,
-        # or all rows if selected, will be shown.
-        
-        
         if(input$disp == "head") {
             return(head(dataInput()))
-        }
-        else {
+        } else {
             return(dataInput())
         }
-        
     })
-        
+
+    output$slope <- renderText({
+        if(!is.null(lmdata$model)) {
+            coef(lmdata$model)[2]
+        } else {
+            "No model available"
+        }
+    })
+    
+    output$intercept <- renderText({
+        if(!is.null(lmdata$model)) {
+            coef(lmdata$model)[1]
+        } else {
+            "No model available"
+        }
+    })
+    
+    output$correlation <- renderText({
+        if(!is.null(lmdata$model)) {
+            cor(dataInput()$x, dataInput()$y)
+        } else {
+            "No model available"
+        }
+    })
 }
 
 # Run the application 
